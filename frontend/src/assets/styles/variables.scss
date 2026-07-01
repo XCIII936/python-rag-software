@@ -1,0 +1,63 @@
+// ========== 颜色系统 ==========
+$primary-color: #409EFF;
+$primary-light: #66B1FF;
+$primary-dark: #3A8EE6;
+$success-color: #67C23A;
+$warning-color: #E6A23C;
+$danger-color: #F56C6C;
+$info-color: #909399;
+
+$text-primary: #303133;
+$text-regular: #606266;
+$text-secondary: #909399;
+$text-placeholder: #C0C4CC;
+
+$border-base: #DCDFE6;
+$border-light: #E4E7ED;
+$border-lighter: #EBEEF5;
+$border-extra-light: #F2F6FC;
+
+$bg-base: #F5F7FA;
+$bg-page: #F0F2F5;
+
+// ========== 布局尺寸 ==========
+$sidebar-width: 220px;
+$sidebar-collapsed-width: 64px;
+$header-height: 60px;
+$main-padding: 20px;
+
+// ========== 圆角 ==========
+$border-radius-base: 4px;
+$border-radius-medium: 8px;
+$border-radius-large: 12px;
+
+// ========== 阴影 ==========
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+$shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+// ========== 过渡 ==========
+$transition-fast: 0.2s ease;
+$transition-normal: 0.3s ease;
+$transition-slow: 0.5s ease;
+
+// ========== 字体 ==========
+$font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-base: 14px;
+$font-size-md: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+$font-size-xxl: 24px;
+
+// ========== Z-index ==========
+$z-sidebar: 1000;
+$z-header: 1001;
+$z-modal: 2000;
+
+// ========== Chat ==========
+$chat-bubble-user-bg: #409EFF;
+$chat-bubble-user-color: #FFFFFF;
+$chat-bubble-assistant-bg: #F0F2F5;
+$chat-bubble-assistant-color: #303133;

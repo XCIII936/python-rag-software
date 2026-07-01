@@ -1,0 +1,190 @@
+@use './variables' as *;
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: $font-family;
+  font-size: $font-size-base;
+  color: $text-primary;
+  background-color: $bg-page;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: $primary-color;
+  text-decoration: none;
+  &:hover {
+    color: $primary-light;
+  }
+}
+
+// ========== 滚动条样式 ==========
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+  &:hover {
+    background: #909399;
+  }
+}
+
+// ========== Element Plus 覆盖 ==========
+.el-card {
+  border-radius: $border-radius-medium;
+  box-shadow: $shadow-sm;
+}
+
+.el-table {
+  font-size: $font-size-base;
+}
+
+.el-button {
+  border-radius: $border-radius-base;
+}
+
+.el-dialog {
+  border-radius: $border-radius-medium;
+}
+
+// ========== 聊天气泡样式 ==========
+.chat-bubble-user {
+  align-self: flex-end;
+  background-color: $chat-bubble-user-bg;
+  color: $chat-bubble-user-color;
+  border-radius: 16px 16px 4px 16px;
+  padding: 12px 16px;
+  max-width: 70%;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.chat-bubble-assistant {
+  align-self: flex-start;
+  background-color: $chat-bubble-assistant-bg;
+  color: $chat-bubble-assistant-color;
+  border-radius: 16px 16px 16px 4px;
+  padding: 12px 16px;
+  max-width: 70%;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+// ========== Markdown 内容样式 ==========
+.markdown-content {
+  line-height: 1.8;
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+  }
+  h1 { font-size: 1.6em; }
+  h2 { font-size: 1.4em; }
+  h3 { font-size: 1.2em; }
+  p {
+    margin: 0.5em 0;
+  }
+  ul, ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+  }
+  li {
+    margin: 0.25em 0;
+  }
+  code {
+    background-color: rgba(0, 0, 0, 0.06);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1em 0;
+    code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+  }
+  blockquote {
+    border-left: 4px solid $primary-color;
+    padding-left: 1em;
+    margin: 1em 0;
+    color: $text-secondary;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    th, td {
+      border: 1px solid $border-base;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: $bg-base;
+      font-weight: 600;
+    }
+  }
+  img {
+    max-width: 100%;
+    border-radius: 4px;
+  }
+  a {
+    color: $primary-color;
+    text-decoration: underline;
+    &:hover {
+      color: $primary-dark;
+    }
+  }
+}
+
+// ========== 加载骨架屏 ==========
+.skeleton-loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ========== 页面通用 ==========
+.page-container {
+  padding: $main-padding;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  h2 {
+    margin: 0;
+    font-size: $font-size-xl;
+    font-weight: 600;
+  }
+}
