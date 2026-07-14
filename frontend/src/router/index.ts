@@ -80,6 +80,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/chapter/ChapterManageView.vue'),
         meta: { title: '章节管理', requiresAuth: true, role: 'teacher' },
       },
+      {
+        path: 'admin/chapters/:id/assessment-config',
+        name: 'AssessmentConfig',
+        component: () => import('@/views/assessment/AssessmentConfigView.vue'),
+        meta: { title: '考核配置', requiresAuth: true, role: 'teacher' },
+      },
       // 知识库
       {
         path: 'knowledge-base',
@@ -93,24 +99,6 @@ const routes: RouteRecordRaw[] = [
         name: 'LlmConfig',
         component: () => import('@/views/system/LlmConfigView.vue'),
         meta: { title: 'LLM 配置', requiresAuth: true, role: 'teacher' },
-      },
-      {
-        path: 'system/agents',
-        name: 'AgentManage',
-        component: () => import('@/views/system/AgentManageView.vue'),
-        meta: { title: '智能体管理', requiresAuth: true, role: 'teacher' },
-      },
-      {
-        path: 'system/agents/:id',
-        name: 'AgentDetail',
-        component: () => import('@/views/system/AgentDetailView.vue'),
-        meta: { title: '智能体详情', requiresAuth: true, role: 'teacher' },
-      },
-      {
-        path: 'system/agents/:id/invoke',
-        name: 'AgentInvoke',
-        component: () => import('@/views/system/AgentInvokeView.vue'),
-        meta: { title: '调用智能体', requiresAuth: true, role: 'teacher' },
       },
       {
         path: 'system/logs',
@@ -156,6 +144,16 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
     return
+  }
+
+  // 角色权限检查
+  const requiredRole = to.meta.role as string | undefined
+  if (requiredRole) {
+    const userRole = localStorage.getItem('user_role') || ''
+    if (userRole !== requiredRole) {
+      next({ name: 'Dashboard' })
+      return
+    }
   }
 
   next()

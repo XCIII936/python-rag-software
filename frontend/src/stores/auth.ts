@@ -36,10 +36,11 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const res = await apiLogin(loginData)
-      const { token: newToken, user: userData } = res.data
+      const { access_token: newToken, user: userData } = res
       token.value = newToken
       user.value = userData
       setToken(newToken)
+      localStorage.setItem('user_role', userData.role)
       ElMessage.success('登录成功')
     } catch (err: any) {
       throw err
@@ -55,10 +56,11 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const res = await apiRegister(registerData)
-      const { token: newToken, user: userData } = res.data
+      const { access_token: newToken, user: userData } = res
       token.value = newToken
       user.value = userData
       setToken(newToken)
+      localStorage.setItem('user_role', userData.role)
       ElMessage.success('注册成功')
     } catch (err: any) {
       throw err
@@ -74,6 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value = null
     removeToken()
+    localStorage.removeItem('user_role')
   }
 
   /**
@@ -83,7 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     try {
       const res = await apiGetProfile()
-      user.value = res.data
+      user.value = res
     } catch {
       // 如果获取失败但 token 存在，可能是 token 过期
       // 由请求拦截器处理 401 跳转
@@ -96,7 +99,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function updateProfileData(data: UpdateProfileData): Promise<void> {
     try {
       const res = await apiUpdateProfile(data)
-      user.value = res.data
+      user.value = res
       ElMessage.success('个人信息更新成功')
     } catch (err: any) {
       throw err

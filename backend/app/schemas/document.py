@@ -24,6 +24,7 @@ class DocumentUpdate(BaseModel):
 class DocumentResponse(BaseModel):
     id: int
     chapter_id: Optional[int] = None
+    chapter_title: Optional[str] = None
     title: str
     file_type: str
     file_size: Optional[int] = None

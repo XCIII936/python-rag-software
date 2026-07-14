@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.chapter import Chapter
+from app.models.llm_config import LlmConfig
 from app.models.assessment import ChapterAssessmentConfig
 from app.services.llm.dashscope_client import chat
 
@@ -50,12 +51,12 @@ def _build_generation_prompt(
     sys_prompt = """你是一位专业的课程考核出题专家。请根据提供的章节信息和知识点，生成考核题目。
 
 要求：
-1. 题目必须紧扣章节内容和知识点
+1. 题目必须紧扣章节内容和知识点，每道题覆盖不同的知识点
 2. 题目难度适中，既考察基础知识也考察理解应用
 3. 选择题必须有4个选项（A、B、C、D），且只有一个正确答案
 4. 判断题答案为"正确"或"错误"
 5. 简答题需要提供参考答案要点
-6. 严格按照指定的题目类型和数量生成
+6. 严格按照指定的题目类型和数量生成，例如要求1道选择题就必须只生成1道
 
 请以JSON格式返回，格式为：
 {
@@ -137,9 +138,18 @@ def generate_questions(
     messages = _build_generation_prompt(config, chapter)
 
     last_error = None
+
+    # Get active LLM config for provider selection
+    llm_config = db.query(LlmConfig).filter(LlmConfig.is_active == True).first()
+    llm_kwargs = {
+        "provider": llm_config.provider if llm_config else "dashscope",
+        "base_url": llm_config.base_url if llm_config else None,
+        "model": llm_config.model_name if llm_config else None,
+    }
+
     for attempt in range(_MAX_RETRIES):
         try:
-            response_text = chat(messages)
+            response_text = chat(messages, **llm_kwargs)
             if not response_text:
                 last_error = "Empty response from LLM"
                 logger.warning(f"Question gen attempt {attempt + 1}: {last_error}")

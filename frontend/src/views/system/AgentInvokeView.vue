@@ -77,10 +77,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChatLineSquare } from '@element-plus/icons-vue'
 import { getAgent, type Agent } from '@/api/agent'
+import { createSSEConnection, type SSEResult } from '@/utils/sse'
 
 interface ChatMsg {
   role: 'user' | 'assistant'
@@ -97,14 +98,18 @@ const messages = ref<ChatMsg[]>([])
 const inputText = ref('')
 const sending = ref(false)
 const messagesRef = ref<HTMLElement | null>(null)
+let currentSSE: SSEResult | null = null
 
 onMounted(async () => {
   try {
-    const res = await getAgent(agentId)
-    agent.value = res.data
+    agent.value = await getAgent(agentId)
   } catch { /* 已处理 */ } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  currentSSE?.abort()
 })
 
 async function handleSend() {
@@ -120,14 +125,35 @@ async function handleSend() {
   scrollToBottom()
 
   try {
-    // TODO: 接入后端 API
-    setTimeout(() => {
-      messages.value[idx] = { role: 'assistant', content: `收到消息: "${text}"\n\n这是一个模拟回复。` }
-      sending.value = false
-      scrollToBottom()
-    }, 1000)
+    currentSSE = createSSEConnection(
+      `/agents/${agentId}/invoke`,
+      { message: text },
+      {
+        onToken: (token: string) => {
+          const msg = messages.value[idx]
+          if (msg && msg.loading) {
+            msg.loading = false
+          }
+          messages.value[idx] = {
+            role: 'assistant',
+            content: (messages.value[idx]?.content || '') + token,
+          }
+          scrollToBottom()
+        },
+        onDone: () => {
+          sending.value = false
+          currentSSE = null
+          scrollToBottom()
+        },
+        onError: (error: string) => {
+          messages.value[idx] = { role: 'assistant', content: `请求失败: ${error}` }
+          sending.value = false
+          currentSSE = null
+        },
+      }
+    )
   } catch {
-    messages.value[idx] = { role: 'assistant', content: '请求失败，请重试。' }
+    messages.value[idx] = { role: 'assistant', content: '发送失败，请重试。' }
     sending.value = false
   }
 }

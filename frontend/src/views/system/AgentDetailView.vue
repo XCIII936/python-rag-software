@@ -52,8 +52,7 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const res = await getAgent(agentId)
-    agent.value = res.data
+    agent.value = await getAgent(agentId)
   } catch {
     // 已处理
   } finally {

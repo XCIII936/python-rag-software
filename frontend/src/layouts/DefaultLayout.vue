@@ -47,6 +47,11 @@
             <template #title>章节管理</template>
           </el-menu-item>
 
+          <el-menu-item index="/knowledge-base">
+            <el-icon><FolderOpened /></el-icon>
+            <template #title>知识库</template>
+          </el-menu-item>
+
           <el-sub-menu index="system">
             <template #title>
               <el-icon><Setting /></el-icon>
@@ -55,10 +60,6 @@
             <el-menu-item index="/system/llm-config">
               <el-icon><Cpu /></el-icon>
               <template #title>LLM 配置</template>
-            </el-menu-item>
-            <el-menu-item index="/system/agents">
-              <el-icon><User /></el-icon>
-              <template #title>智能体管理</template>
             </el-menu-item>
             <el-menu-item index="/system/logs">
               <el-icon><Document /></el-icon>

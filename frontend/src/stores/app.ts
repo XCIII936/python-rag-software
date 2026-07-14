@@ -39,7 +39,7 @@ export const useAppStore = defineStore('app', () => {
     loading.value = true
     try {
       const res = await apiGetDashboardStats()
-      systemStats.value = res.data
+      systemStats.value = res
     } catch (err: any) {
       console.error('获取仪表盘数据失败:', err)
     } finally {
@@ -53,7 +53,7 @@ export const useAppStore = defineStore('app', () => {
   async function fetchLlmConfig(): Promise<void> {
     try {
       const res = await apiGetLlmConfig()
-      llmConfig.value = res.data
+      llmConfig.value = res
     } catch (err: any) {
       console.error('获取 LLM 配置失败:', err)
     }
@@ -65,7 +65,7 @@ export const useAppStore = defineStore('app', () => {
   async function updateLlmConfigAction(data: Partial<LlmConfig>): Promise<void> {
     try {
       const res = await apiUpdateLlmConfig(data)
-      llmConfig.value = res.data
+      llmConfig.value = res
       ElMessage.success('LLM 配置更新成功')
     } catch (err: any) {
       throw err

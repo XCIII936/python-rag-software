@@ -135,8 +135,7 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const res = await getDashboardStats()
-    stats.value = res.data
+    stats.value = await getDashboardStats()
   } catch {
     // 错误已在 request.ts 中处理
   } finally {

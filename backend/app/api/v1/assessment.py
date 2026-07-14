@@ -1,6 +1,7 @@
 """Assessment API routes."""
 
 import json
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -65,12 +66,23 @@ def create_or_update_config(
         ChapterAssessmentConfig.chapter_id == data.chapter_id
     ).first()
 
+    def _serialize_for_db(data_dict: dict) -> dict:
+        """JSON-encode list/dict values for Text columns."""
+        result = {}
+        for k, v in data_dict.items():
+            if isinstance(v, (list, dict)):
+                result[k] = json.dumps(v, ensure_ascii=False)
+            else:
+                result[k] = v
+        return result
+
     if existing:
-        for key, value in data.model_dump(exclude_unset=True).items():
+        update_data = _serialize_for_db(data.model_dump(exclude_unset=True))
+        for key, value in update_data.items():
             setattr(existing, key, value)
         config = existing
     else:
-        config = ChapterAssessmentConfig(**data.model_dump())
+        config = ChapterAssessmentConfig(**_serialize_for_db(data.model_dump()))
         db.add(config)
 
     # Calculate total questions
@@ -263,7 +275,7 @@ def submit_assessment(
     record.total_score = total_score
     record.correct_answers = correct_count
     record.status = "completed"
-    record.completed_at = __import__("datetime").datetime.utcnow()
+    record.completed_at = datetime.utcnow()
     db.commit()
 
     # Generate report
@@ -278,7 +290,7 @@ def submit_assessment(
         progress.status = "completed"
         progress.best_score = total_score
         progress.assessment_count += 1
-        progress.completed_at = __import__("datetime").datetime.utcnow()
+        progress.completed_at = datetime.utcnow()
         db.commit()
 
     log_info("assessment", f"完成考核: 章节{record.chapter_id}, 得分{total_score:.1f}", user_id=current_user.id)

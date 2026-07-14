@@ -15,17 +15,22 @@
         class="chapter-col"
       >
         <el-card shadow="never" class="chapter-card" @click="router.push(`/chapters/${chapter.id}/learn`)">
-          <div class="chapter-order">{{ chapter.order }}</div>
+          <div class="chapter-order">{{ chapter.order_index + 1 }}</div>
           <h3 class="chapter-title">{{ chapter.title }}</h3>
           <p class="chapter-desc">{{ chapter.description || '暂无描述' }}</p>
           <div class="chapter-footer">
-            <el-tag size="small" :type="statusType(chapter.status)">
-              {{ statusLabel(chapter.status) }}
-            </el-tag>
-            <span class="chapter-docs">
-              <el-icon><Document /></el-icon>
-              {{ chapter.document_count }} 个文档
-            </span>
+            <el-tag v-if="chapter.is_active" size="small" type="success">已发布</el-tag>
+            <el-tag v-else size="small" type="info">已归档</el-tag>
+            <div class="chapter-progress">
+              <component :is="progressStatus(chapter.id).icon" :color="progressStatus(chapter.id).color" :size="16" />
+              <span :style="{ color: progressStatus(chapter.id).color, fontSize: '12px', marginLeft: '4px' }">
+                {{ progressStatus(chapter.id).label }}
+              </span>
+              <span v-if="progressMap[chapter.id]?.best_score !== null && progressMap[chapter.id]?.best_score !== undefined"
+                    style="margin-left: 8px; font-size: 12px; color: #909399;">
+                {{ Math.round(progressMap[chapter.id].best_score!) }}分
+              </span>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -47,17 +52,27 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Document } from '@element-plus/icons-vue'
-import { getChapters, type Chapter } from '@/api/chapter'
+import { Document, SuccessFilled, Clock, CircleClose } from '@element-plus/icons-vue'
+import { getChapters, getProgress, type Chapter } from '@/api/chapter'
 
 const router = useRouter()
 const chapters = ref<Chapter[]>([])
 const loading = ref(true)
+const progressMap = ref<Record<number, { status: string; best_score: number | null }>>({})
 
 onMounted(async () => {
   try {
-    const res = await getChapters({ status: 'published' })
-    chapters.value = res.data
+    const [ch, prog] = await Promise.all([
+      getChapters(),
+      getProgress().catch(() => []),
+    ])
+    chapters.value = ch
+    // Build progress map keyed by chapter id
+    const map: Record<number, { status: string; best_score: number | null }> = {}
+    for (const p of prog as any[]) {
+      map[p.chapter_id] = { status: p.status, best_score: p.best_score }
+    }
+    progressMap.value = map
   } catch {
     // 错误已在 request.ts 中处理
   } finally {
@@ -65,21 +80,13 @@ onMounted(async () => {
   }
 })
 
-function statusType(status: string): 'success' | 'warning' | 'info' {
-  switch (status) {
-    case 'published': return 'success'
-    case 'draft': return 'warning'
-    case 'archived': return 'info'
-    default: return 'info'
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'published': return '已发布'
-    case 'draft': return '草稿'
-    case 'archived': return '已归档'
-    default: return status
+function progressStatus(chapterId: number): { icon: any; label: string; color: string } {
+  const p = progressMap.value[chapterId]
+  if (!p) return { icon: CircleClose, label: '待学习', color: '#C0C4CC' }
+  switch (p.status) {
+    case 'completed': return { icon: SuccessFilled, label: '已完成', color: '#67C23A' }
+    case 'pending': return { icon: Clock, label: '进行中', color: '#E6A23C' }
+    default: return { icon: CircleClose, label: '待学习', color: '#C0C4CC' }
   }
 }
 </script>
@@ -137,6 +144,12 @@ function statusLabel(status: string): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.chapter-progress {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .chapter-docs {

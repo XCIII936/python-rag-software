@@ -7,9 +7,30 @@ a formatted context string for LLM prompts.
 import logging
 from typing import List, Optional
 
+from langchain_core.embeddings import Embeddings
+
 from app.core.config import settings
 
 logger = logging.getLogger("course_agent.rag")
+
+
+class DashScopeEmbeddings(Embeddings):
+    """LangChain Embeddings wrapper for DashScope text-embedding-v3.
+
+    Uses the real DashScope embedding API (1536 dimensions).
+    """
+
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed a list of documents."""
+        return generate_embeddings(texts, api_key=self.api_key)
+
+    def embed_query(self, text: str) -> List[float]:
+        """Embed a single query string."""
+        from app.services.llm.dashscope_client import get_embedding
+        return get_embedding(text, api_key=self.api_key)
 
 
 def _get_milvus_collection() -> Optional["Milvus"]:
@@ -19,7 +40,6 @@ def _get_milvus_collection() -> Optional["Milvus"]:
     """
     try:
         from langchain_milvus import Milvus as LangChainMilvus
-        from langchain_community.embeddings import FakeEmbeddings
         from pymilvus import connections
 
         # Try connecting to Milvus
@@ -30,11 +50,8 @@ def _get_milvus_collection() -> Optional["Milvus"]:
             timeout=5,
         )
 
-        # Use a simple embedding function — in production this would be
-        # the DashScope embedding model wrapped in a LangChain embedder.
-        # For now we use FakeEmbeddings so that the vectorstore is available
-        # even without a live embedding API.
-        embeddings = FakeEmbeddings(size=768)
+        # Real DashScope embeddings wrapper — uses text-embedding-v3 (1536 dim)
+        embeddings = DashScopeEmbeddings()
 
         vectorstore = LangChainMilvus(
             embedding_function=embeddings,
@@ -111,14 +128,18 @@ def query_knowledge_base(
         return ""
 
 
-def generate_embeddings(texts: List[str]) -> List[List[float]]:
+def generate_embeddings(
+    texts: List[str],
+    api_key: Optional[str] = None,
+) -> List[List[float]]:
     """Batch-generate embeddings for a list of texts.
 
     Uses the DashScope embedding API. Returns a list of embedding vectors
-    where each vector is a list of floats.
+    where each vector is a list of floats (1536 dimensions).
 
     Args:
         texts: List of text strings to embed.
+        api_key: Optional API key override.
 
     Returns:
         List of embedding vectors.
@@ -128,7 +149,7 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
     embeddings = []
     for text in texts:
         try:
-            vec = get_embedding(text)
+            vec = get_embedding(text, api_key=api_key)
             embeddings.append(vec)
         except Exception as exc:
             logger.error(f"Failed to generate embedding: {exc}")

@@ -1,15 +1,23 @@
 """Agent configuration API routes."""
 
+import json
+import logging
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.dependencies import get_current_user, require_teacher
 from app.models.user import User
 from app.models.agent import AgentConfig
-from app.schemas.agent import AgentCreate, AgentUpdate, AgentResponse
+from app.models.llm_config import LlmConfig
+from app.schemas.agent import AgentCreate, AgentUpdate, AgentResponse, AgentInvokeRequest
+from app.services.llm.dashscope_client import stream_chat
 from app.utils.logger import log_info
+
+logger = logging.getLogger("course_agent.agents")
 
 router = APIRouter()
 
@@ -83,3 +91,56 @@ def delete_agent(
     db.delete(agent)
     db.commit()
     return {"message": "智能体已删除"}
+
+
+@router.post("/{agent_id}/invoke")
+async def invoke_agent(
+    agent_id: int,
+    data: AgentInvokeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Invoke an agent with SSE streaming response.
+
+    Uses the agent's system prompt and the active LLM config to
+    generate a streaming response.
+    """
+    agent = db.query(AgentConfig).filter(AgentConfig.id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="智能体不存在")
+    if not agent.is_active:
+        raise HTTPException(status_code=400, detail="智能体已停用")
+
+    # Get active LLM config for provider selection
+    llm_config = db.query(LlmConfig).filter(LlmConfig.is_active == True).first()
+    model = llm_config.model_name if llm_config else "qwen3-max"
+    provider = llm_config.provider if llm_config else "dashscope"
+    base_url = llm_config.base_url if llm_config else None
+
+    # Build messages: system prompt (agent) + user message
+    system_prompt = agent.system_prompt or "你是一个有帮助的智能体。"
+    messages_for_llm = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": data.message},
+    ]
+
+    async def generate():
+        full_response = ""
+        try:
+            async for chunk in stream_chat(
+                messages=messages_for_llm,
+                model=model,
+                provider=provider,
+                base_url=base_url,
+            ):
+                if chunk:
+                    full_response += chunk
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Agent invoke failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'content': f'抱歉，发生错误: {str(e)}'})}\n\n"
+        finally:
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")

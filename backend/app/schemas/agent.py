@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class AgentCreate(BaseModel):
+    model_config = {'protected_namespaces': ()}
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -17,6 +18,7 @@ class AgentCreate(BaseModel):
 
 
 class AgentUpdate(BaseModel):
+    model_config = {'protected_namespaces': ()}
     name: Optional[str] = None
     description: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -27,7 +29,13 @@ class AgentUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class AgentInvokeRequest(BaseModel):
+    model_config = {'protected_namespaces': ()}
+    message: str = Field(..., min_length=1)
+
+
 class AgentResponse(BaseModel):
+    model_config = {'protected_namespaces': (), 'from_attributes': True}
     id: int
     name: str
     description: Optional[str] = None
@@ -38,6 +46,3 @@ class AgentResponse(BaseModel):
     top_p: float
     is_active: bool
     created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

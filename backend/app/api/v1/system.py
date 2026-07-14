@@ -18,6 +18,7 @@ from app.schemas.system import (
     LlmConfigUpdate,
     LlmConfigResponse,
     DashboardStats,
+    ActivityItem,
     LogResponse,
 )
 from app.utils.logger import log_info
@@ -30,13 +31,33 @@ def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get dashboard statistics."""
+    """Get dashboard statistics with recent activity."""
+    # Recent activity from system logs
+    recent_logs = (
+        db.query(SystemLog)
+        .order_by(SystemLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    activity = []
+    for log in recent_logs:
+        user = db.query(User).filter(User.id == log.user_id).first() if log.user_id else None
+        activity.append(ActivityItem(
+            id=log.id,
+            username=user.username if user else "",
+            action=log.action or "",
+            module=log.module or "",
+            detail=log.message or "",
+            created_at=log.created_at,
+        ))
+
     return DashboardStats(
         total_students=db.query(User).filter(User.role == "student").count(),
         total_chapters=db.query(Chapter).filter(Chapter.is_active == True).count(),
         total_documents=db.query(KnowledgeBaseDocument).count(),
         total_assessments=db.query(AssessmentRecord).count(),
         total_chat_sessions=db.query(ChatSession).count(),
+        recent_activity=activity,
     )
 
 
@@ -89,11 +110,10 @@ def test_llm_connection(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_teacher),
 ):
-    """Test LLM API connection."""
-    config = db.query(LlmConfig).filter(LlmConfig.is_active == True).first()
-    api_key = config.api_key if config else settings.DASHSCOPE_API_KEY
+    """Test LLM API connection using the system API key."""
+    api_key = settings.DASHSCOPE_API_KEY
     if not api_key:
-        raise HTTPException(status_code=400, detail="未配置 API Key")
+        raise HTTPException(status_code=400, detail="未配置 API Key（请设置系统环境变量 ali-qwen3-max-api）")
     # Simple test - will be expanded with actual LLM call
     return {"message": "连接测试已发送", "status": "checking"}
 
@@ -102,25 +122,45 @@ def test_llm_connection(
 def get_system_logs(
     level: Optional[str] = None,
     module: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher),
 ):
     """Get system logs with pagination and filters (teacher only)."""
-    query = db.query(SystemLog)
+    query = db.query(
+        SystemLog, User.username
+    ).outerjoin(
+        User, SystemLog.user_id == User.id
+    )
+
     if level:
         query = query.filter(SystemLog.level == level.upper())
     if module:
         query = query.filter(SystemLog.module == module)
+    if start_date:
+        query = query.filter(SystemLog.created_at >= start_date)
+    if end_date:
+        query = query.filter(SystemLog.created_at <= f"{end_date} 23:59:59")
+
     total = query.count()
-    logs = (
+    results = (
         query.order_by(SystemLog.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+    items = []
+    for log_row, username in results:
+        item = LogResponse.model_validate(log_row)
+        item_dict = item.model_dump()
+        item_dict["username"] = username or ""
+        items.append(item_dict)
+
     return {
         "total": total,
-        "items": [LogResponse.model_validate(l) for l in logs],
+        "items": items,
     }

@@ -19,8 +19,8 @@ from app.api.v1 import (
     documents,
     chat,
     assessment,
-    agents,
     system,
+    agents,
 )
 
 
@@ -49,6 +49,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8080",
         "http://localhost",
+        "http://127.0.0.1",
+        "http://127.0.0.1:8080",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -121,5 +123,5 @@ app.include_router(chapters.router, prefix="/api/v1/chapters", tags=["Chapters"]
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(assessment.router, prefix="/api/v1/assessment", tags=["Assessment"])
-app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])

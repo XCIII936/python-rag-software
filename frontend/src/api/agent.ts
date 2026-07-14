@@ -1,4 +1,4 @@
-import request, { type ApiResponse } from './request'
+import request from './request'
 
 export interface Agent {
   id: number
@@ -47,41 +47,41 @@ export interface AgentInvokeResponse {
 /**
  * 获取智能体列表
  */
-export function getAgents(params?: { status?: string }): Promise<ApiResponse<Agent[]>> {
+export function getAgents(params?: { status?: string }): Promise<Agent[]> {
   return request.get('/agents', { params }).then(res => res.data)
 }
 
 /**
  * 获取智能体详情
  */
-export function getAgent(id: number): Promise<ApiResponse<Agent>> {
+export function getAgent(id: number): Promise<Agent> {
   return request.get(`/agents/${id}`).then(res => res.data)
 }
 
 /**
  * 创建智能体
  */
-export function createAgent(data: AgentCreate): Promise<ApiResponse<Agent>> {
+export function createAgent(data: AgentCreate): Promise<Agent> {
   return request.post('/agents', data).then(res => res.data)
 }
 
 /**
  * 更新智能体
  */
-export function updateAgent(id: number, data: AgentUpdate): Promise<ApiResponse<Agent>> {
+export function updateAgent(id: number, data: AgentUpdate): Promise<Agent> {
   return request.put(`/agents/${id}`, data).then(res => res.data)
 }
 
 /**
  * 删除智能体
  */
-export function deleteAgent(id: number): Promise<ApiResponse<null>> {
+export function deleteAgent(id: number): Promise<{ message: string }> {
   return request.delete(`/agents/${id}`).then(res => res.data)
 }
 
 /**
  * 调用智能体
  */
-export function invokeAgent(id: number, data: AgentInvokeData): Promise<ApiResponse<AgentInvokeResponse>> {
+export function invokeAgent(id: number, data: AgentInvokeData): Promise<AgentInvokeResponse> {
   return request.post(`/agents/${id}/invoke`, data).then(res => res.data)
 }

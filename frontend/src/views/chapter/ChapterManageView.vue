@@ -15,21 +15,22 @@
         style="width: 100%"
         empty-text="暂无章节"
       >
-        <el-table-column prop="order" label="排序" width="70" />
+        <el-table-column prop="order_index" label="排序" width="70" />
         <el-table-column prop="title" label="章节名称" min-width="200" />
         <el-table-column prop="description" label="描述" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="statusType(row.status)" size="small">
-              {{ statusLabel(row.status) }}
+            <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+              {{ row.is_active ? '已发布' : '已归档' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="document_count" label="文档数" width="80" />
         <el-table-column prop="created_at" label="创建时间" width="170" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link @click="openDialog(row)">编辑</el-button>
+            <el-button size="small" type="success" link @click="router.push(`/admin/chapters/${row.id}/assessment-config`)">配置考核</el-button>
             <el-button size="small" type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -49,12 +50,8 @@
         <el-form-item label="描述">
           <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入描述" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="formData.status" style="width: 100%">
-            <el-option label="草稿" value="draft" />
-            <el-option label="已发布" value="published" />
-            <el-option label="已归档" value="archived" />
-          </el-select>
+        <el-form-item label="已发布">
+          <el-switch v-model="formData.is_active" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -67,6 +64,7 @@
 
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getChapters, createChapter, updateChapter, deleteChapter, type Chapter } from '@/api/chapter'
@@ -77,11 +75,12 @@ const dialogVisible = ref(false)
 const editingChapter = ref<Chapter | null>(null)
 const saving = ref(false)
 const formRef = ref<FormInstance>()
+const router = useRouter()
 
 const formData = reactive({
   title: '',
   description: '',
-  status: 'draft' as 'draft' | 'published' | 'archived',
+  is_active: true,
 })
 
 const formRules: FormRules = {
@@ -93,8 +92,7 @@ onMounted(() => fetchChapters())
 async function fetchChapters() {
   loading.value = true
   try {
-    const res = await getChapters()
-    chapters.value = res.data
+    chapters.value = await getChapters()
   } catch { /* 已处理 */ } finally {
     loading.value = false
   }
@@ -105,12 +103,12 @@ function openDialog(chapter?: Chapter) {
     editingChapter.value = chapter
     formData.title = chapter.title
     formData.description = chapter.description || ''
-    formData.status = chapter.status as any
+    formData.is_active = chapter.is_active ?? true
   } else {
     editingChapter.value = null
     formData.title = ''
     formData.description = ''
-    formData.status = 'draft'
+    formData.is_active = true
   }
   dialogVisible.value = true
 }
@@ -143,20 +141,4 @@ async function handleDelete(chapter: Chapter) {
   } catch { /* 已处理 */ }
 }
 
-function statusType(status: string) {
-  switch (status) {
-    case 'published': return 'success'
-    case 'draft': return 'warning'
-    default: return 'info'
-  }
-}
-
-function statusLabel(status: string) {
-  switch (status) {
-    case 'published': return '已发布'
-    case 'draft': return '草稿'
-    case 'archived': return '已归档'
-    default: return status
-  }
-}
 </script>

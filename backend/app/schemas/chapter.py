@@ -24,6 +24,7 @@ class ChapterResponse(BaseModel):
     description: Optional[str] = None
     order_index: int
     is_active: bool
+    document_count: Optional[int] = None
     created_at: Optional[datetime] = None
 
     class Config:

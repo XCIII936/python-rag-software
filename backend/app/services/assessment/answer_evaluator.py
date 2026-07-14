@@ -12,6 +12,7 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AssessmentQuestion
+from app.models.llm_config import LlmConfig
 from app.services.llm.dashscope_client import chat
 
 logger = logging.getLogger("course_agent.assessment.evaluator")
@@ -26,6 +27,7 @@ def _evaluate_short_answer(
     question_content: str,
     correct_answer: str,
     user_answer: str,
+    llm_kwargs: dict,
 ) -> tuple:
     """Use LLM to evaluate a short answer.
 
@@ -54,7 +56,7 @@ def _evaluate_short_answer(
     ]
 
     try:
-        response = chat(prompt)
+        response = chat(prompt, **llm_kwargs)
         cleaned = response.strip()
         if cleaned.startswith("```json"):
             cleaned = cleaned[7:]
@@ -94,6 +96,14 @@ def evaluate_answers(
         Updates the score, is_correct, and ai_evaluation fields of each
         AssessmentQuestion in-place. The caller is expected to commit.
     """
+    # Query active LLM config for short-answer evaluation
+    llm_config = db.query(LlmConfig).filter(LlmConfig.is_active == True).first()
+    llm_kwargs = {
+        "provider": llm_config.provider if llm_config else "dashscope",
+        "base_url": llm_config.base_url if llm_config else None,
+        "model": llm_config.model_name if llm_config else None,
+    }
+
     for question in questions:
         user_answer = (question.user_answer or "").strip()
         correct_answer = (question.correct_answer or "").strip()
@@ -118,6 +128,7 @@ def evaluate_answers(
                 question_content=question.question_content,
                 correct_answer=correct_answer,
                 user_answer=user_answer,
+                llm_kwargs=llm_kwargs,
             )
             question.score = float(score)
             question.is_correct = is_correct

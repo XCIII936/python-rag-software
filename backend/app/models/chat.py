@@ -25,7 +25,7 @@ class ChatMessage(Base):
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
     role = Column(String(20), nullable=False)  # user | assistant | system
     content = Column(Text, nullable=False)
-    metadata = Column(Text, nullable=True)  # JSON: citations, sources, etc.
+    meta_info = Column(Text, nullable=True)  # JSON: citations, sources, etc.
     tokens_used = Column(Integer, nullable=True)
     model_used = Column(String(100), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

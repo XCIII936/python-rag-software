@@ -8,11 +8,21 @@ from app.db.database import get_db
 from app.core.dependencies import get_current_user, require_teacher
 from app.models.user import User
 from app.models.chapter import Chapter
+from app.models.document import KnowledgeBaseDocument
 from app.models.progress import ChapterProgress
 from app.schemas.chapter import ChapterCreate, ChapterUpdate, ChapterResponse, ChapterReorder
 from app.utils.logger import log_info
 
 router = APIRouter()
+
+
+def _chapter_response(chapter: Chapter, db: Session) -> ChapterResponse:
+    """Build ChapterResponse with document count."""
+    resp = ChapterResponse.model_validate(chapter)
+    resp.document_count = db.query(KnowledgeBaseDocument).filter(
+        KnowledgeBaseDocument.chapter_id == chapter.id
+    ).count()
+    return resp
 
 
 @router.get("", response_model=List[ChapterResponse])
@@ -27,7 +37,7 @@ def list_chapters(
         .order_by(Chapter.order_index.asc())
         .all()
     )
-    return [ChapterResponse.model_validate(c) for c in chapters]
+    return [_chapter_response(c, db) for c in chapters]
 
 
 @router.post("", response_model=ChapterResponse)
@@ -47,40 +57,6 @@ def create_chapter(
     db.refresh(chapter)
     log_info("chapter", f"创建章节: {chapter.title}")
     return ChapterResponse.model_validate(chapter)
-
-
-@router.put("/{chapter_id}", response_model=ChapterResponse)
-def update_chapter(
-    chapter_id: int,
-    data: ChapterUpdate,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_teacher),
-):
-    """Update a chapter (teacher only)."""
-    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(chapter, key, value)
-    db.commit()
-    db.refresh(chapter)
-    return ChapterResponse.model_validate(chapter)
-
-
-@router.delete("/{chapter_id}")
-def delete_chapter(
-    chapter_id: int,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_teacher),
-):
-    """Delete a chapter (teacher only)."""
-    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
-    if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
-    chapter.is_active = False
-    db.commit()
-    log_info("chapter", f"删除章节: {chapter.title}")
-    return {"message": "章节已删除"}
 
 
 @router.put("/reorder")
@@ -128,3 +104,50 @@ def get_chapter_progress(
             "best_score": float(prog.best_score) if prog and prog.best_score else None,
         })
     return result
+
+
+@router.get("/{chapter_id}", response_model=ChapterResponse)
+def get_chapter(
+    chapter_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a single chapter by ID."""
+    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    return _chapter_response(chapter, db)
+
+
+@router.put("/{chapter_id}", response_model=ChapterResponse)
+def update_chapter(
+    chapter_id: int,
+    data: ChapterUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher),
+):
+    """Update a chapter (teacher only)."""
+    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(chapter, key, value)
+    db.commit()
+    db.refresh(chapter)
+    return ChapterResponse.model_validate(chapter)
+
+
+@router.delete("/{chapter_id}")
+def delete_chapter(
+    chapter_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher),
+):
+    """Delete a chapter (teacher only)."""
+    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    chapter.is_active = False
+    db.commit()
+    log_info("chapter", f"删除章节: {chapter.title}")
+    return {"message": "章节已删除"}

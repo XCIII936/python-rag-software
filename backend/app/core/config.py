@@ -1,7 +1,10 @@
 """Application configuration via environment variables."""
 
-from pydantic_settings import BaseSettings
+import os
 from typing import Optional
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -35,6 +38,14 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: list[str] = [
         ".pdf", ".ppt", ".pptx", ".doc", ".docx"
     ]
+
+    @model_validator(mode="after")
+    def resolve_api_key(self) -> "Settings":
+        """Prefer system env `ali-qwen3-max-api` over DASHSCOPE_API_KEY / .env."""
+        system_key = os.environ.get("ali-qwen3-max-api")
+        if system_key:
+            self.DASHSCOPE_API_KEY = system_key
+        return self
 
     class Config:
         env_file = ".env"

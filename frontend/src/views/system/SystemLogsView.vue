@@ -135,19 +135,19 @@ async function fetchLogs() {
   loading.value = true
   try {
     const params: any = {
-      page: currentPage.value,
-      page_size: pageSize.value,
+      skip: (currentPage.value - 1) * pageSize.value,
+      limit: pageSize.value,
     }
     if (filters.level) params.level = filters.level
     if (filters.module) params.module = filters.module
     if (dateRange.value) {
-      params.start_time = dateRange.value[0]
-      params.end_time = dateRange.value[1]
+      params.start_date = dateRange.value[0]
+      params.end_date = dateRange.value[1]
     }
 
     const res = await getLogs(params)
-    logs.value = res.data.items
-    total.value = res.data.total
+    logs.value = res.items
+    total.value = res.total
   } catch {
     // 错误已在 request.ts 中处理
   } finally {

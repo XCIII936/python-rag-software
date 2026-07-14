@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.llm_config import LlmConfig
 from app.models.assessment import (
     AssessmentQuestion,
     AssessmentRecord,
@@ -181,8 +182,16 @@ def generate_report(
     strengths = []
     weaknesses = []
 
+    # Get active LLM config for provider selection
+    llm_config = db.query(LlmConfig).filter(LlmConfig.is_active == True).first()
+    llm_kwargs = {
+        "provider": llm_config.provider if llm_config else "dashscope",
+        "base_url": llm_config.base_url if llm_config else None,
+        "model": llm_config.model_name if llm_config else None,
+    }
+
     try:
-        response_text = chat(messages)
+        response_text = chat(messages, **llm_kwargs)
         cleaned = response_text.strip()
         if cleaned.startswith("```json"):
             cleaned = cleaned[7:]

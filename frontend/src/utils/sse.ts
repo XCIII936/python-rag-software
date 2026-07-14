@@ -1,14 +1,22 @@
 import { getToken } from './auth'
 
+export interface RecommendationItem {
+  title: string
+  resource_type: string
+  description: string
+  relevance_score: number
+  source_info: Record<string, any>
+}
+
 interface SSEHandlers {
   onToken?: (token: string) => void
   onContext?: (context: string) => void
-  onRecommendation?: (recommendation: string) => void
+  onRecommendation?: (recommendation: RecommendationItem[]) => void
   onError?: (error: string) => void
   onDone?: () => void
 }
 
-interface SSEResult {
+export interface SSEResult {
   abort: () => void
 }
 
@@ -178,11 +186,13 @@ export function createChatSSE(
   body: Record<string, any>,
   onToken: (token: string) => void,
   onDone: () => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  onRecommendation?: (recommendations: RecommendationItem[]) => void
 ): SSEResult {
   return createSSEConnection(url, body, {
     onToken,
     onDone,
     onError,
+    onRecommendation,
   })
 }

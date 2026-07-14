@@ -181,8 +181,7 @@ onMounted(() => {
 async function fetchAgents() {
   loading.value = true
   try {
-    const res = await getAgents()
-    agents.value = res.data
+    agents.value = await getAgents()
   } catch {
     // 错误已在 request.ts 中处理
   } finally {
