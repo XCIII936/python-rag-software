@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
     ALLOWED_EXTENSIONS: list[str] = [
-        ".pdf", ".ppt", ".pptx", ".doc", ".docx"
+        ".pdf", ".ppt", ".pptx", ".doc", ".docx", ".md", ".markdown"
     ]
 
     @model_validator(mode="after")

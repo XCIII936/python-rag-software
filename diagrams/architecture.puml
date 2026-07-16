@@ -1,0 +1,56 @@
+@startuml 系统架构图
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+
+title 图3-1 课程教学智能体系统总体架构图
+
+' === 用户层 ===
+rectangle "    用户浏览器\n    Vue 3 + Element Plus SPA" as Browser #BBDEFB
+
+' === 网关层 ===
+rectangle "    Nginx :80\n    静态文件 + API反向代理 + SSE" as Nginx #FFE0B2
+
+' === 后端层 ===
+package "    FastAPI 后端服务 :8000" as Backend #C8E6C9 {
+    rectangle "  认证授权 Auth" as Auth #A5D6A7
+    rectangle "  AI对话 Chat\n  SSE+RAG" as Chat #A5D6A7
+    rectangle "  章节考核\n  Assessment" as Assess #A5D6A7
+    rectangle "  文档管理\n  Documents" as Doc #A5D6A7
+    rectangle "  系统管理\n  System" as System #A5D6A7
+}
+
+' === 服务引擎层 ===
+package "    核心引擎" as Engine #FFF9C4 {
+    rectangle "  LLM 调用\n  Qwen / DeepSeek" as LLM #FFECB3
+    rectangle "  RAG 检索\n  LangChain" as RAG #FFECB3
+    rectangle "  文档解析\n  PDF/PPT/Word" as Parser #FFECB3
+}
+
+' === 数据层 ===
+package "    数据存储" as Data #E1BEE7 {
+    database "  SQLite\n  (14张表)" as SQLite #CE93D8
+    database "  Milvus\n  (向量检索)" as Milvus #CE93D8
+    folder "  /uploads\n  (文件存储)" as Files #CE93D8
+}
+
+' === 外部 ===
+cloud "  阿里云 DashScope\n  Qwen3-Max" as Cloud #FFCDD2
+
+' === 垂直连接（简洁的分层结构） ===
+Browser -down-> Nginx : HTTP \nSSE流式
+Nginx -down-> Backend : /api/*
+
+Auth -down-> LLM
+Chat -down-> RAG
+Chat -down-> LLM
+Doc -down-> Parser
+Parser -down-> RAG
+RAG -down-> Milvus
+Assess -down-> LLM
+System --> SQLite
+Doc --> Files
+LLM -right-> Cloud : API Key
+
+@enduml

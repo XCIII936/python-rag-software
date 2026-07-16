@@ -45,7 +45,7 @@
         </el-table-column>
         <el-table-column prop="file_type" label="类型" width="80">
           <template #default="{ row }">
-            <el-tag size="small">{{ row.file_type?.toUpperCase() }}</el-tag>
+            <el-tag size="small" :type="row.file_type === 'md' ? 'success' : ''">{{ row.file_type?.toUpperCase() }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="chapter_title" label="所属章节" width="130">
@@ -102,7 +102,7 @@
             :file-list="fileList"
             :on-change="handleFileChange"
             :on-remove="() => { selectedFile = null }"
-            accept=".pdf,.ppt,.pptx,.doc,.docx"
+            accept=".pdf,.ppt,.pptx,.doc,.docx,.md,.markdown"
             drag
             class="upload-area"
           >
@@ -111,7 +111,7 @@
               将文件拖到此处，或<em>点击选择</em>
             </div>
             <template #tip>
-              <div class="upload-tip">支持 PDF、PPT、DOCX 格式，单个文件不超过 50MB</div>
+              <div class="upload-tip">支持 PDF、PPT、DOCX、Markdown(.md) 格式，单个文件不超过 50MB</div>
             </template>
           </el-upload>
         </el-form-item>

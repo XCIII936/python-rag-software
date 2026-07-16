@@ -1,0 +1,161 @@
+@startuml 数据库ER图
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 10
+
+title 图3-4 数据库实体关系图（SQLite — 14张表）
+
+' ===== 核心实体（居中） =====
+entity "users\n用户表" as users #BBDEFB {
+    * id
+    --
+    username
+    password_hash
+    role
+    email
+}
+
+entity "chapters\n课程章节" as chapters #C8E6C9 {
+    * id
+    --
+    title
+    description
+    order_index
+}
+
+' ===== 对话域（右侧） =====
+entity "chat_sessions\n对话会话" as sessions #B3E5FC {
+    * id
+    --
+    user_id <<FK>>
+    chapter_id <<FK>>
+    title
+}
+
+entity "chat_messages\n对话消息" as messages #B3E5FC {
+    * id
+    --
+    session_id <<FK>>
+    role
+    content
+}
+
+entity "resource_recommendations\n资源推荐" as recs #FFF9C4 {
+    * id
+    --
+    session_id <<FK>>
+    title
+    relevance_score
+}
+
+' ===== 考核域（下方） =====
+entity "assessment_configs\n考核配置" as configs #F8BBD0 {
+    * id
+    --
+    chapter_id <<FK UK>>
+    knowledge_points
+    question_types
+    evaluation_dimensions
+}
+
+entity "assessment_records\n考核记录" as records #F8BBD0 {
+    * id
+    --
+    user_id <<FK>>
+    chapter_id <<FK>>
+    config_id <<FK>>
+    status
+    total_score
+}
+
+entity "assessment_questions\n考核题目" as questions #F8BBD0 {
+    * id
+    --
+    record_id <<FK>>
+    question_type
+    is_correct
+    score
+}
+
+entity "assessment_reports\n评价报告" as reports #F8BBD0 {
+    * id
+    --
+    record_id <<FK UK>>
+    overall_score
+    dimension_scores
+}
+
+' ===== 文档/进度域（左侧） =====
+entity "knowledge_base_documents\n知识库文档" as docs #FFE0B2 {
+    * id
+    --
+    chapter_id <<FK>>
+    uploaded_by <<FK>>
+    title
+    file_type
+    status
+}
+
+entity "chapter_progress\n学习进度" as progress #E8F5E9 {
+    * id
+    --
+    user_id <<FK>>
+    chapter_id <<FK>>
+    status
+    best_score
+}
+
+' ===== 系统域（顶部） =====
+entity "system_logs\n系统日志" as logs #ECEFF1 {
+    * id
+    --
+    user_id <<FK>>
+    level
+    module
+    action
+}
+
+entity "agent_configs\n智能体配置" as agents #EDE7F6 {
+    * id
+    --
+    created_by <<FK>>
+    name
+    system_prompt
+}
+
+entity "llm_configs\n大模型配置" as llm #EDE7F6 {
+    * id
+    --
+    updated_by <<FK>>
+    provider
+    model_name
+}
+
+' ===== 关系（清晰的业务流向） =====
+' 用户发起对话
+users ||--o{ sessions : "创建"
+sessions ||--o{ messages : "包含"
+sessions ||--o{ recs : "产生"
+
+' 用户参加考核
+users ||--o{ records : "参加"
+records ||--o{ questions : "出题"
+records ||--|| reports : "生成"
+
+' 用户学习进度
+users ||--o{ progress : "记录"
+users ||--o{ docs : "上传"
+
+' 章节关联
+chapters ||--o{ docs : "资料"
+chapters ||--o{ records : "考核"
+chapters ||--o{ progress : "进度"
+chapters ||--|| configs : "配置"
+configs ||--o{ records : "应用"
+
+' 系统管理
+users ||--o{ agents : "创建"
+users ||--o{ llm : "配置"
+users ||--o{ logs : "操作"
+
+@enduml

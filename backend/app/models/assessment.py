@@ -55,6 +55,7 @@ class AssessmentQuestion(Base):
     score = Column(Numeric(5, 2), default=0)
     is_correct = Column(Boolean, nullable=True)
     ai_evaluation = Column(Text, nullable=True)  # LLM feedback for short answers
+    explanation = Column(Text, nullable=True)  # LLM correction/explanation for wrong answers
     created_at = Column(DateTime, server_default=func.now())
 
 

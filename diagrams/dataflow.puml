@@ -1,0 +1,35 @@
+@startuml 核心功能数据流
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+
+title 图3-3 三大核心功能数据流
+
+' ===== 功能一：RAG 问答 =====
+rectangle "功能一：RAG 课程问答" as F1 #E3F2FD {
+    (提问) --> (向量化\nEmbedding)
+    (向量化\nEmbedding) --> (Milvus\n语义检索)
+    (Milvus\n语义检索) --> (注入上下文\n构建Prompt)
+    (注入上下文\n构建Prompt) --> (LLM\n流式生成)
+    (LLM\n流式生成) --> (SSE推送\n前端渲染)
+}
+
+' ===== 功能二：资源推荐 =====
+rectangle "功能二：学习资源推荐" as F2 #FFF3E0 {
+    (对话完成) --> (联合查询\nMilvus)
+    (联合查询\nMilvus) --> (排序去重\nTop-5)
+    (排序去重\nTop-5) --> (推荐卡片\n前端展示)
+}
+
+' ===== 功能三：章节考核 =====
+rectangle "功能三：章节考核" as F3 #E8F5E9 {
+    (教师预设\n参数配置) --> (LLM\n自动出题)
+    (LLM\n自动出题) --> (学生\n逐题作答)
+    (学生\n逐题作答) --> (交卷\n自动评分)
+    (交卷\n自动评分) --> (生成报告\n多维评价)
+}
+
+F1 -[hidden]right- F2
+F2 -[hidden]right- F3
+
+@enduml

@@ -68,3 +68,22 @@ class ReportResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class QuestionReviewItem(BaseModel):
+    """Full per-question review: content, answers, score, and AI correction."""
+
+    id: int
+    question_index: int
+    question_type: str
+    question_content: str
+    options: Optional[List[str]] = None
+    user_answer: Optional[str] = None
+    correct_answer: Optional[str] = None
+    is_correct: Optional[bool] = None
+    score: Optional[float] = None
+    ai_evaluation: Optional[str] = None
+    explanation: Optional[str] = None
+
+    class Config:
+        from_attributes = True

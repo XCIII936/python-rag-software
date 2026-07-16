@@ -1,7 +1,7 @@
 """Document upload and management API routes.
 
 Includes background processing of uploaded documents:
-1. Parse file content (PDF/PPT/Word parsers)
+1. Parse file content (PDF/PPT/Word/Markdown parsers)
 2. Split text into chunks (Chinese-aware)
 3. Generate embeddings and index into Milvus
 4. Update document status
@@ -140,6 +140,30 @@ def process_and_index_document(doc_id: int) -> None:
                         "chapter_id": doc.chapter_id,
                         "document_id": doc.id,
                         "title": source_name,
+                    }
+                })
+            doc.page_count = len(parsed)
+
+        elif ext in (".md", ".markdown"):
+            from app.services.document_parse.markdown_parser import parse_markdown
+            parsed = parse_markdown(file_path)
+            for p in parsed:
+                text = p.get("content", "").strip()
+                if not text:
+                    continue
+                heading = p.get("heading", "")
+                section_idx = p.get("section_index", 1)
+                title = f"{source_name} - {heading}" if heading else source_name
+                all_text_segments.append({
+                    "content": text,
+                    "metadata": {
+                        "source": source_name,
+                        "page": section_idx,
+                        "file_type": "md",
+                        "chapter_id": doc.chapter_id,
+                        "document_id": doc.id,
+                        "title": title,
+                        "heading": heading,
                     }
                 })
             doc.page_count = len(parsed)
@@ -348,7 +372,7 @@ def get_document_file(
     return FileResponse(
         path=doc.file_path,
         filename=doc.title or os.path.basename(doc.file_path),
-        media_type="application/octet-stream",
+        media_type="text/markdown; charset=utf-8" if doc.file_type in ("md", "markdown") else "application/octet-stream",
     )
 
 

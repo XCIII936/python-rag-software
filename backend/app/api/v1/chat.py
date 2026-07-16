@@ -259,6 +259,7 @@ async def send_message(
     model = llm_config.model_name if llm_config else settings.LLM_MODEL
     provider = llm_config.provider if llm_config else "dashscope"
     base_url = llm_config.base_url if llm_config else None
+    api_key = llm_config.api_key if llm_config and llm_config.api_key else None
 
     # Build chat history (last 20 messages, excluding the current user message)
     history = (
@@ -303,6 +304,7 @@ async def send_message(
                 model=model,
                 provider=provider,
                 base_url=base_url,
+                api_key=api_key,
             ):
                 if chunk:
                     full_response += chunk

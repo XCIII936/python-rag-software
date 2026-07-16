@@ -31,19 +31,26 @@
 
       <!-- 报告详情（从后端获取的完整报告） -->
       <div v-if="report" class="report-detail">
-        <!-- 维度评分 -->
+        <!-- 维度评分：雷达图 + 条形对照 -->
         <div v-if="dimensions.length > 0" class="dimension-section">
           <h3>各维度评分</h3>
-          <div v-for="(dim, idx) in dimensions" :key="idx" class="dimension-item">
-            <div class="dimension-header">
-              <span class="dimension-name">{{ dim.name || dim.dimension }}</span>
-              <span class="dimension-score">{{ dim.score }}分</span>
+          <div class="dimension-layout">
+            <div class="dimension-radar">
+              <RadarChart :dimensions="dimensions" height="300px" />
             </div>
-            <el-progress
-              :percentage="dim.score"
-              :color="dim.score >= 60 ? '#67C23A' : '#F56C6C'"
-              :stroke-width="12"
-            />
+            <div class="dimension-bars">
+              <div v-for="(dim, idx) in dimensions" :key="idx" class="dimension-item">
+                <div class="dimension-header">
+                  <span class="dimension-name">{{ dim.name || dim.dimension }}</span>
+                  <span class="dimension-score">{{ dim.score }}分</span>
+                </div>
+                <el-progress
+                  :percentage="dim.score"
+                  :color="dim.score >= 60 ? '#67C23A' : '#F56C6C'"
+                  :stroke-width="12"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -87,6 +94,29 @@
         </el-descriptions>
       </div>
 
+      <!-- 逐题详细回顾：错题点评纠正 -->
+      <div class="question-review-section">
+        <el-divider />
+        <div class="review-section-header">
+          <h3>逐题详细回顾</h3>
+          <el-radio-group v-model="reviewFilter" size="small">
+            <el-radio-button value="all">全部 ({{ reviewItems.length }})</el-radio-button>
+            <el-radio-button value="wrong">仅看错题 ({{ wrongCount }})</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <div v-loading="reviewLoading">
+          <template v-if="filteredReviewItems.length > 0">
+            <QuestionReviewCard
+              v-for="item in filteredReviewItems"
+              :key="item.id"
+              :item="item"
+            />
+          </template>
+          <el-empty v-else-if="!reviewLoading" description="暂无题目详情" />
+        </div>
+      </div>
+
       <div class="result-actions">
         <el-button type="primary" @click="router.push('/chapters')">
           返回章节列表
@@ -102,13 +132,23 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getReport, type ReportData } from '@/api/assessment'
+import {
+  getReport,
+  getAssessmentReview,
+  type ReportData,
+  type QuestionReviewItem as QuestionReviewItemType,
+} from '@/api/assessment'
+import RadarChart from '@/components/assessment/RadarChart.vue'
+import QuestionReviewCard from '@/components/assessment/QuestionReviewCard.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
+const reviewLoading = ref(true)
 const report = ref<ReportData | null>(null)
+const reviewItems = ref<QuestionReviewItemType[]>([])
+const reviewFilter = ref<'all' | 'wrong'>('all')
 
 const recordId = computed(() => Number(route.params.recordId))
 const correctCount = computed(() => Number(route.query.correct) || 0)
@@ -155,6 +195,15 @@ const suggestionsList = computed(() => {
   return []
 })
 
+const wrongCount = computed(() => reviewItems.value.filter(i => i.is_correct === false).length)
+
+const filteredReviewItems = computed(() => {
+  if (reviewFilter.value === 'wrong') {
+    return reviewItems.value.filter(i => i.is_correct === false)
+  }
+  return reviewItems.value
+})
+
 onMounted(async () => {
   if (recordId.value && recordId.value > 0) {
     try {
@@ -162,6 +211,20 @@ onMounted(async () => {
     } catch {
       // 报告不存在或尚未生成，使用 query 参数中的数据
     }
+
+    try {
+      reviewItems.value = await getAssessmentReview(recordId.value)
+      // 默认若存在错题，自动切换到"仅看错题"视图，帮助学生第一时间关注薄弱点
+      if (reviewItems.value.some(i => i.is_correct === false)) {
+        reviewFilter.value = 'wrong'
+      }
+    } catch {
+      reviewItems.value = []
+    } finally {
+      reviewLoading.value = false
+    }
+  } else {
+    reviewLoading.value = false
   }
   loading.value = false
 })
@@ -171,7 +234,7 @@ onMounted(async () => {
 @use '@/assets/styles/variables' as *;
 
 .result-card {
-  max-width: 700px;
+  max-width: 860px;
   margin: 0 auto;
 }
 
@@ -223,6 +286,23 @@ onMounted(async () => {
   }
 }
 
+.dimension-layout {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+
+  .dimension-radar {
+    flex: 1 1 320px;
+    min-width: 280px;
+  }
+
+  .dimension-bars {
+    flex: 1 1 280px;
+    min-width: 240px;
+  }
+}
+
 .dimension-item {
   margin-bottom: 16px;
 
@@ -252,6 +332,24 @@ onMounted(async () => {
     background: $bg-base;
     padding: 16px;
     border-radius: 8px;
+  }
+}
+
+.question-review-section {
+  margin-top: 8px;
+}
+
+.review-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: $text-primary;
   }
 }
 

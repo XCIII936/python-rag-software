@@ -18,71 +18,83 @@
 
 ## 🚀 快速启动
 
-### 方式一：开发模式（推荐）
-
-#### 前置条件
-
-- Python 3.11+
-- Node.js 20+
-- Milvus 2.4+（可选，不影响核心功能）
-
-#### 1. 配置后端
-
-```bash
-cd backend
-cp .env.example .env
-# 编辑 .env，填入 DASHSCOPE_API_KEY
-```
-
-安装依赖并初始化：
-
-```bash
-pip install -r requirements.txt
-python scripts/init_db.py   # 创建数据库 + 管理员账号
-```
-
-启动后端：
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-#### 2. 配置前端
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-#### 3. 访问
-
-浏览器打开 `http://localhost:5173`
-
-默认管理员：`admin` / `admin123`
-
----
-
-### 方式二：Docker 部署
+### 方式一：Docker 部署（推荐 ✅）
 
 #### 前置条件
 
 - Docker & Docker Compose
 
-#### 启动
+#### 1. 配置 API Key
 
 ```bash
-# 复制环境变量模板并填入 API Key
-cp backend/.env.example backend/.env
-# 编辑 backend/.env 中的 DASHSCOPE_API_KEY
+# 方式 A：设置系统环境变量（推荐，docker-compose.yml 会自动读取）
+# Linux/macOS:
+export DASHSCOPE_API_KEY="your-api-key-here"
 
-# 一键启动（含 Milvus 向量数据库）
+# Windows PowerShell:
+$env:DASHSCOPE_API_KEY="your-api-key-here"
+
+# 方式 B：复制模板文件并编辑
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入 DASHSCOPE_API_KEY=sk-xxx
+```
+
+#### 2. 一键启动
+
+```bash
 docker compose up -d --build
 ```
 
-#### 访问
+首次启动会：
+- 拉取 etcd / MinIO / Milvus / Python / Nginx 镜像
+- 自动创建数据库表并导入种子数据（管理员账号 / 8 章课程资料 / 考核配置）
+- 等待所有服务就绪（约 30 秒）
 
-浏览器打开 `http://localhost:8080`
+#### 3. 访问
+
+| 服务 | 地址 |
+|------|------|
+| 前端页面 | http://localhost:8080 |
+| 后端 API | http://localhost:8000 |
+| API 文档 (Swagger) | http://localhost:8000/docs |
+| 健康检查 | http://localhost:8000/api/v1/health |
+
+默认管理员：`admin` / `admin123`
+
+#### 4. 停止
+
+```bash
+docker compose down
+```
+
+---
+
+### 方式二：开发模式
+
+#### 前置条件
+
+- Python 3.11+
+- Node.js 20+
+- Milvus 2.4+（可选，可通过 Docker 单独启动）
+
+#### 1. 启动后端
+
+```bash
+cd backend
+pip install -r requirements.txt
+python -m scripts.init_db      # 创建数据库 + 管理员账号
+uvicorn app.main:app --reload --port 8000
+```
+
+#### 2. 启动前端
+
+```bash
+cd frontend
+npm install
+npm run dev                     # 访问 http://localhost:5173
+```
+
+前端 Vite 开发服务器会自动代理 `/api` 请求到后端 8000 端口。
 
 ---
 
@@ -92,34 +104,41 @@ docker compose up -d --build
 course-teaching-agent/
 ├── frontend/                     # Vue 3 + Element Plus + TypeScript
 │   ├── src/
-│   │   ├── api/                  # API 调用层
-│   │   ├── assets/               # 样式文件
-│   │   ├── layouts/              # 布局组件
-│   │   ├── router/               # 路由 + 权限守卫
+│   │   ├── api/                  # API 调用层（8 个模块）
+│   │   ├── assets/               # 全局样式文件
+│   │   ├── components/           # 公共组件（雷达图/题目回顾）
+│   │   ├── layouts/              # 布局组件（Auth/Default）
+│   │   ├── router/               # 路由配置 + JWT 权限守卫
 │   │   ├── stores/               # Pinia 状态管理
 │   │   ├── utils/                # SSE 客户端、Token 管理
-│   │   └── views/                # 页面组件
-│   ├── nginx.conf                # 生产环境 Nginx 配置
+│   │   └── views/                # 页面组件（18 个视图）
+│   ├── nginx.conf                # Nginx 配置（SSE + SPA 回退）
 │   └── Dockerfile
 │
 ├── backend/                      # FastAPI + SQLAlchemy + SQLite
 │   ├── app/
-│   │   ├── api/v1/               # 路由层（7 个模块）
-│   │   ├── core/                 # 配置、安全、依赖注入
-│   │   ├── crud/                 # CRUD 操作
-│   │   ├── db/                   # 数据库引擎
+│   │   ├── api/v1/               # 路由层（7 模块：auth/chat/chapters/
+│   │   │                         #   assessment/documents/agents/system）
+│   │   ├── core/                 # 配置（config）、安全（JWT）、依赖注入
+│   │   ├── crud/                 # CRUD 操作层
+│   │   ├── db/                   # SQLAlchemy 引擎 + Session
 │   │   ├── models/               # ORM 模型（14 张表）
-│   │   ├── schemas/              # Pydantic 模型
-│   │   ├── services/
-│   │   │   ├── llm/              # LLM 客户端（Qwen + DeepSeek）
-│   │   │   ├── rag/              # RAG 向量检索
-│   │   │   ├── assessment/       # 出题、评分、报告
+│   │   ├── schemas/              # Pydantic 请求/响应模型
+│   │   ├── services/             # 核心服务层
+│   │   │   ├── llm/              # LLM 客户端（DashScope + OpenAI 兼容）
+│   │   │   ├── rag/              # RAG 检索链 + 文本分块
+│   │   │   ├── assessment/       # 出题 / 评分 / 报告生成
 │   │   │   ├── recommendation/   # 资源推荐
-│   │   │   └── document_parse/   # PDF/PPT/Word 解析
+│   │   │   └── document_parse/   # PDF / PPT / Word / Markdown 解析
 │   │   └── utils/                # 日志、文件工具
+│   ├── scripts/init_db.py        # 数据库初始化 + 种子数据
+│   ├── uploads/                  # 上传文档存储
+│   ├── requirements.txt
 │   └── Dockerfile
 │
-├── docker-compose.yml            # 全栈编排（含 Milvus）
+├── course_materials/             # 《软件工程》8 章课程资料（Markdown）
+├── diagrams/                     # PlantUML 架构图（4 张）
+├── docker-compose.yml            # 全栈编排（5 服务）
 └── README.md
 ```
 
@@ -189,3 +208,19 @@ course-teaching-agent/
 ## 📝 许可证
 
 MIT
+
+---
+
+## 📦 成果文件清单
+
+| 类别 | 文件 | 说明 |
+|------|------|------|
+| 前端源码 | `frontend/` | Vue 3 + Element Plus（40个源文件） |
+| 后端源码 | `backend/app/` | FastAPI + SQLAlchemy（64个源文件） |
+| 数据库 | `backend/course_teaching_agent.db` | SQLite 数据库（含种子数据） |
+| 数据库脚本 | `backend/scripts/init_db.py` | 建表 + 种子数据 |
+| 课程设计报告 | `课程教学智能体系统-课程设计报告.docx` | 含系统设计/功能说明/数据结构设计/API文档/部署说明 |
+| 部署配置 | `docker-compose.yml` | 5 服务编排 |
+| 部署配置 | `backend/Dockerfile`、`frontend/Dockerfile` | 容器构建文件 |
+| 架构图 | `diagrams/` | PlantUML 图（架构/部署/数据流/ER） |
+| 项目说明 | `README.md` | 本文档 |

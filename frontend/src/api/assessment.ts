@@ -40,11 +40,31 @@ export interface ReportData {
   weaknesses: any
 }
 
+export interface QuestionReviewItem {
+  id: number
+  question_index: number
+  question_type: 'choice' | 'true_false' | 'short_answer'
+  question_content: string
+  options: string[] | null
+  user_answer: string | null
+  correct_answer: string | null
+  is_correct: boolean | null
+  score: number | null
+  ai_evaluation: string | null
+  explanation: string | null
+}
+
 /**
  * 获取章节考核配置
+ * 当章节尚未配置考核时返回 null（不弹错误提示）
  */
-export function getAssessmentConfig(chapterId: number): Promise<AssessmentConfigData> {
-  return request.get(`/assessment/configs/chapter/${chapterId}`).then(res => res.data)
+export function getAssessmentConfig(chapterId: number): Promise<AssessmentConfigData | null> {
+  return request.get(`/assessment/configs/chapter/${chapterId}`, {
+    validateStatus: (status) => status === 200 || status === 404,
+  }).then(res => {
+    if (res.status === 404) return null
+    return res.data
+  })
 }
 
 /**
@@ -103,4 +123,11 @@ export function submitAssessment(recordId: number): Promise<SubmitResult> {
  */
 export function getReport(recordId: number): Promise<ReportData> {
   return request.get(`/assessment/${recordId}/report`).then(res => res.data)
+}
+
+/**
+ * 获取逐题详细回顾（含用户答案/正确答案/AI点评与纠正说明）
+ */
+export function getAssessmentReview(recordId: number): Promise<QuestionReviewItem[]> {
+  return request.get(`/assessment/${recordId}/review`).then(res => res.data)
 }

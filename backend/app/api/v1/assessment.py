@@ -24,6 +24,7 @@ from app.schemas.assessment import (
     QuestionResponse,
     AssessmentRecordResponse,
     ReportResponse,
+    QuestionReviewItem,
 )
 from app.services.assessment.question_generator import generate_questions
 from app.services.assessment.answer_evaluator import evaluate_answers
@@ -332,3 +333,51 @@ def get_assessment_history(
         query = query.filter(AssessmentRecord.chapter_id == chapter_id)
     records = query.order_by(AssessmentRecord.created_at.desc()).all()
     return [AssessmentRecordResponse.model_validate(r) for r in records]
+
+
+@router.get("/{record_id}/review", response_model=list[QuestionReviewItem])
+def get_assessment_review(
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get the full per-question review for a completed assessment:
+    question content, user answer, correct answer, score, AI evaluation,
+    and a detailed correction/explanation (especially useful for wrong
+    answers).
+    """
+    record = db.query(AssessmentRecord).filter(AssessmentRecord.id == record_id).first()
+    if not record or record.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="考核记录不存在")
+
+    questions = (
+        db.query(AssessmentQuestion)
+        .filter(AssessmentQuestion.record_id == record_id)
+        .order_by(AssessmentQuestion.question_index.asc())
+        .all()
+    )
+
+    results = []
+    for q in questions:
+        options_list = None
+        if q.options:
+            try:
+                options_list = json.loads(q.options)
+            except (json.JSONDecodeError, TypeError):
+                options_list = None
+        results.append(
+            QuestionReviewItem(
+                id=q.id,
+                question_index=q.question_index,
+                question_type=q.question_type,
+                question_content=q.question_content,
+                options=options_list,
+                user_answer=q.user_answer,
+                correct_answer=q.correct_answer,
+                is_correct=q.is_correct,
+                score=float(q.score) if q.score is not None else None,
+                ai_evaluation=q.ai_evaluation,
+                explanation=q.explanation,
+            )
+        )
+    return results

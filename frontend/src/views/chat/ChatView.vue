@@ -125,11 +125,11 @@
           >
             <div class="rec-type-tag">
               <el-tag
-                :type="rec.resource_type === 'ppt_slide' ? 'warning' : rec.resource_type === 'pdf_page' ? 'primary' : 'success'"
+                :type="rec.resource_type === 'ppt_slide' ? 'warning' : rec.resource_type === 'pdf_page' ? 'primary' : rec.resource_type === 'markdown_section' ? 'success' : 'success'"
                 size="small"
                 effect="plain"
               >
-                {{ rec.resource_type === 'ppt_slide' ? '课件' : rec.resource_type === 'pdf_page' ? 'PDF' : '章节' }}
+                {{ rec.resource_type === 'ppt_slide' ? '课件' : rec.resource_type === 'pdf_page' ? 'PDF' : rec.resource_type === 'markdown_section' ? '文档' : '章节' }}
               </el-tag>
             </div>
             <div class="rec-title">{{ rec.title }}</div>

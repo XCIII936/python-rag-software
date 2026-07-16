@@ -112,6 +112,8 @@ def recommend_resources(
                 resource_type = "pdf_page"
             elif file_type in ("doc", "docx"):
                 resource_type = "document_section"
+            elif file_type in ("md", "markdown"):
+                resource_type = "markdown_section"
             else:
                 resource_type = "chapter_section"
 

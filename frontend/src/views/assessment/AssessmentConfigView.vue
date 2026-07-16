@@ -242,10 +242,9 @@ onMounted(async () => {
     const ch = await getChapter(chapterId)
     chapter.value = { id: ch.id, title: ch.title }
 
-    // 尝试获取已有配置
-    try {
-      const config = await getAssessmentConfig(chapterId)
-      // 解析已有配置填充表单
+    // 尝试获取已有配置（null = 尚未配置，不影响）
+    const config = await getAssessmentConfig(chapterId)
+    if (config) {
       const kp = config.knowledge_points
       if (typeof kp === 'string') {
         try { form.knowledgePoints = JSON.parse(kp) } catch { form.knowledgePoints = [] }
@@ -282,9 +281,8 @@ onMounted(async () => {
       if (config.passing_score != null) {
         form.passingScore = config.passing_score
       }
-    } catch {
-      // 没有配置，使用默认值
     }
+    // config === null → 尚未配置，使用表单默认值
   } catch {
     ElMessage.error('获取章节信息失败')
   } finally {

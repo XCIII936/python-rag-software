@@ -62,17 +62,19 @@ services:
       dockerfile: Dockerfile
     container_name: course-backend
     environment:
-      - DATABASE_URL=sqlite:///./data/course_teaching_agent.db
+      - DATABASE_URL=sqlite:///./course_teaching_agent.db
       - SECRET_KEY=course-agent-secret-change-in-production
-      # API Key 从后端 .env 文件读取（Docker 构建时已 COPY 到镜像内）
+      # API Key — 用 DASHSCOPE_API_KEY（bash/WSL 不支持带 - 的变量名）
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - LLM_MODEL=qwen3-max
       - EMBEDDING_MODEL=text-embedding-v3
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
       - DEBUG=false
     volumes:
-      - backend-data:/app/uploads
-      - backend-db:/app/data
+      - ./backend/uploads:/app/uploads
+      - ./backend/course_teaching_agent.db:/app/course_teaching_agent.db
+      - ./course_materials:/app/course_materials
     networks:
       - course-network
     ports:

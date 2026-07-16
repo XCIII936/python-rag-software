@@ -145,6 +145,7 @@ def generate_questions(
         "provider": llm_config.provider if llm_config else "dashscope",
         "base_url": llm_config.base_url if llm_config else None,
         "model": llm_config.model_name if llm_config else None,
+        "api_key": (llm_config.api_key if llm_config and llm_config.api_key else None),
     }
 
     for attempt in range(_MAX_RETRIES):

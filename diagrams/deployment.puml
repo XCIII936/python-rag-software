@@ -1,0 +1,47 @@
+@startuml 部署架构图
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+
+title 图3-2 Docker Compose 部署架构（docker-compose.yml）
+
+node "Docker Host" {
+    
+    frame "course-network (bridge)" {
+        
+        node "frontend\nnginx:alpine" as FE #FFE0B2 {
+            [静态文件] as SF
+            [反向代理] as RP
+        }
+        
+        node "backend\npython:3.11" as BE #C8E6C9 {
+            [uvicorn :8000] as UV
+            database "SQLite" as DB
+        }
+        
+        node "milvus\nv2.4" as MV #FFCDD2
+        node "etcd\nv3.5" as ET #FFCDD2
+        node "minio" as MN #FFCDD2
+    }
+}
+
+actor 用户 as U
+
+U --> FE : 8080
+RP --> UV : /api/*
+UV --> DB
+UV --> MV : 19530
+MV --> ET
+MV --> MN
+
+note right of FE
+  端口映射: 8080:80
+  SSE: proxy_buffering off
+end note
+
+note right of BE
+  端口映射: 8000:8000
+  volume: uploads, db, course_materials
+end note
+
+@enduml

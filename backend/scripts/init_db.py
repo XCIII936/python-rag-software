@@ -1,7 +1,9 @@
 """Database initialisation script.
 
 Creates all tables, seeds the default teacher account, default LLM config,
-and default chapters for a "Software Engineering" course.
+default chapters for a "Software Engineering" course, imports course
+materials (markdown files) as knowledge-base documents, and creates
+default assessment configurations for each chapter.
 
 Usage:
     python -m scripts.init_db
@@ -9,6 +11,10 @@ Usage:
 
 import sys
 import os
+import shutil
+import uuid
+import hashlib
+import json
 
 # Ensure the backend package is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -17,15 +23,32 @@ import logging
 
 from app.db.database import engine, Base, SessionLocal
 from app.core.security import hash_password
+from app.core.config import settings
 from app.models.user import User
 from app.models.llm_config import LlmConfig
 from app.models.chapter import Chapter
+from app.models.document import KnowledgeBaseDocument
+from app.models.assessment import ChapterAssessmentConfig
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger("init_db")
+
+# ── Constants ──────────────────────────────────────────────────────────
+
+# Mapping from chapter order_index → markdown file name
+CHAPTER_MATERIALS_MAP = {
+    0: "01_软件工程概述.md",
+    1: "02_需求工程.md",
+    2: "03_软件设计与架构.md",
+    3: "04_软件实现与编码规范.md",
+    4: "05_软件测试.md",
+    5: "06_软件维护与项目管理.md",
+    6: "07_软件质量与过程改进.md",
+    7: "08_新兴软件开发方法.md",
+}
 
 
 def create_tables():
@@ -166,6 +189,235 @@ def seed_chapters():
         db.close()
 
 
+# ── Document seeding ───────────────────────────────────────────────────
+
+def _find_course_materials_dir() -> str:
+    """Locate the course_materials directory.
+
+    Looks in (priority order):
+    1. /app/course_materials (Docker volume mount)
+    2. ../course_materials relative to backend/ (local dev)
+    3. ../../course_materials relative to scripts/ (local dev)
+    """
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "course_materials"),
+        os.path.join(os.path.dirname(__file__), "..", "course_materials"),
+        "/app/course_materials",
+    ]
+    for path in candidates:
+        resolved = os.path.abspath(path)
+        if os.path.isdir(resolved):
+            logger.info(f"Found course_materials at: {resolved}")
+            return resolved
+    return ""
+
+
+def seed_documents():
+    """Import markdown course materials into the knowledge base.
+
+    Copies each markdown file to the uploads directory, creates a
+    KnowledgeBaseDocument record linked to its chapter, and indexes
+    the content into Milvus via the background processing pipeline.
+    Skips chapters that already have documents.
+    """
+    db = SessionLocal()
+    try:
+        # Check if any document already exists — skip entirely if so
+        existing = db.query(KnowledgeBaseDocument).count()
+        if existing > 0:
+            logger.info(f"{existing} documents already exist, skipping seed.")
+            return
+
+        # Locate course materials directory
+        materials_dir = _find_course_materials_dir()
+        if not materials_dir:
+            logger.warning(
+                "course_materials directory not found. "
+                "Skipping document seed. Mount it as a volume or place it "
+                "in backend/../course_materials."
+            )
+            return
+
+        admin_user = db.query(User).filter(User.username == "admin").first()
+        admin_id = admin_user.id if admin_user else None
+
+        chapters = (
+            db.query(Chapter)
+            .order_by(Chapter.order_index.asc())
+            .all()
+        )
+
+        imported_count = 0
+        for ch in chapters:
+            filename = CHAPTER_MATERIALS_MAP.get(ch.order_index)
+            if not filename:
+                continue
+
+            source_path = os.path.join(materials_dir, filename)
+            if not os.path.isfile(source_path):
+                logger.warning(f"Course material not found: {source_path}")
+                continue
+
+            # Copy to uploads directory
+            ext = os.path.splitext(filename)[1]
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            upload_dir = os.path.join(settings.UPLOAD_DIR, "documents")
+            os.makedirs(upload_dir, exist_ok=True)
+            dest_path = os.path.join(upload_dir, unique_name)
+
+            shutil.copy2(source_path, dest_path)
+
+            # Compute file hash and size
+            with open(source_path, "rb") as f:
+                content = f.read()
+            file_hash = hashlib.sha256(content).hexdigest()
+            file_size = len(content)
+
+            doc = KnowledgeBaseDocument(
+                chapter_id=ch.id,
+                title=filename,
+                file_type="md",
+                file_path=dest_path,
+                file_size=file_size,
+                file_hash=file_hash,
+                status="pending",
+                uploaded_by=admin_id,
+            )
+            db.add(doc)
+            db.flush()  # get doc.id
+            doc_id = doc.id
+            imported_count += 1
+
+            logger.info(f"Imported document: {filename} → chapter '{ch.title}'")
+
+        db.commit()
+
+        if imported_count == 0:
+            logger.info("No course materials to import.")
+            return
+
+        logger.info(f"Imported {imported_count} documents. Starting indexing...")
+
+        # Index documents into Milvus
+        from app.api.v1.documents import process_and_index_document
+
+        for ch in chapters:
+            # Re-query docs for this chapter (they were committed above)
+            docs = (
+                db.query(KnowledgeBaseDocument)
+                .filter(KnowledgeBaseDocument.chapter_id == ch.id)
+                .all()
+            )
+            for doc in docs:
+                try:
+                    process_and_index_document(doc.id)
+                except Exception as exc:
+                    logger.warning(
+                        f"Indexing failed for {doc.title} (Milvus may not be ready): {exc}"
+                    )
+
+        logger.info("Document indexing complete.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to seed documents: {e}")
+    finally:
+        db.close()
+
+
+# ── Assessment config seeding ──────────────────────────────────────────
+
+def _extract_knowledge_points(description: str) -> list:
+    """Extract knowledge points from chapter description.
+
+    Splits on common Chinese delimiters (、，，；) and filters out
+    short tokens and parenthesized qualifiers.
+    """
+    import re
+    # Split on 、or ，or ；
+    parts = re.split(r"[、，；]", description)
+    points = []
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        # Remove parenthetical notes like （xxx） or (xxx)
+        p = re.sub(r"[（(][^）)]*[）)]", "", p).strip()
+        if len(p) >= 2:
+            points.append(p)
+    return points if points else [description]
+
+
+def seed_assessment_configs():
+    """Create default assessment configurations for each chapter.
+
+    Uses the chapter description to derive knowledge points and sets
+    sensible defaults for question types and evaluation dimensions.
+    Skips chapters that already have a config.
+    """
+    db = SessionLocal()
+    try:
+        chapters = (
+            db.query(Chapter)
+            .order_by(Chapter.order_index.asc())
+            .all()
+        )
+
+        admin_user = db.query(User).filter(User.username == "admin").first()
+        admin_id = admin_user.id if admin_user else None
+
+        created_count = 0
+        for ch in chapters:
+            # Skip if config already exists
+            existing = (
+                db.query(ChapterAssessmentConfig)
+                .filter(ChapterAssessmentConfig.chapter_id == ch.id)
+                .first()
+            )
+            if existing:
+                continue
+
+            knowledge_points = _extract_knowledge_points(ch.description or ch.title)
+
+            # Default question mix: 2 choice, 1 true_false, 1 short_answer
+            question_types = {"choice": 2, "true_false": 1, "short_answer": 1}
+            total = sum(question_types.values())
+
+            # Default evaluation dimensions
+            evaluation_dimensions = [
+                {"name": "知识掌握", "weight": 0.4},
+                {"name": "理解应用", "weight": 0.4},
+                {"name": "分析能力", "weight": 0.2},
+            ]
+
+            config = ChapterAssessmentConfig(
+                chapter_id=ch.id,
+                knowledge_points=json.dumps(knowledge_points, ensure_ascii=False),
+                question_types=json.dumps(question_types, ensure_ascii=False),
+                evaluation_dimensions=json.dumps(evaluation_dimensions, ensure_ascii=False),
+                total_questions=total,
+                passing_score=60,
+                created_by=admin_id,
+            )
+            db.add(config)
+            created_count += 1
+
+        db.commit()
+
+        if created_count > 0:
+            logger.info(
+                f"Created default assessment configs for {created_count} chapters."
+            )
+        else:
+            logger.info("Assessment configs already exist, skipping.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to seed assessment configs: {e}")
+    finally:
+        db.close()
+
+
+# ── Main ───────────────────────────────────────────────────────────────
+
 def main():
     """Run the full initialisation."""
     logger.info("=" * 50)
@@ -176,6 +428,8 @@ def main():
     seed_teacher()
     seed_llm_config()
     seed_chapters()
+    seed_documents()
+    seed_assessment_configs()
 
     logger.info("=" * 50)
     logger.info("Database initialisation complete!")
