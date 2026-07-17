@@ -29,9 +29,11 @@ env/
 .DS_Store
 Thumbs.db
 
-# Uploads
+# Uploads - keep document files, ignore user-uploaded temp files
 backend/uploads/*
 !backend/uploads/.gitkeep
+!backend/uploads/documents/
+!backend/uploads/documents/*
 
 # Docker
 docker-compose.override.yml

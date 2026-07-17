@@ -212,20 +212,74 @@ def _find_course_materials_dir() -> str:
     return ""
 
 
+def _check_milvus_has_data() -> bool:
+    """Check whether the Milvus collection has any data.
+
+    Returns True if data exists, False if empty or unreachable.
+    """
+    try:
+        from pymilvus import connections, Collection
+        connections.connect(
+            alias="default",
+            host=settings.MILVUS_HOST,
+            port=settings.MILVUS_PORT,
+            timeout=5,
+        )
+        col = Collection(settings.MILVUS_COLLECTION)
+        col.load()
+        count = col.num_entities
+        logger.info(f"Milvus collection '{settings.MILVUS_COLLECTION}' has {count} entities.")
+        return count > 0
+    except Exception as exc:
+        logger.warning(f"Milvus check failed (may not be running yet): {exc}")
+        return False
+
+
+def _reindex_all_documents(db) -> int:
+    """Re-index all documents from SQLite into Milvus.
+
+    Returns the number of documents successfully indexed.
+    """
+    from app.api.v1.documents import process_and_index_document
+
+    docs = db.query(KnowledgeBaseDocument).all()
+    success_count = 0
+    for doc in docs:
+        if not os.path.exists(doc.file_path):
+            logger.warning(f"Document file missing, skipping: {doc.file_path}")
+            continue
+        try:
+            process_and_index_document(doc.id)
+            success_count += 1
+            logger.info(f"Re-indexed: {doc.title}")
+        except Exception as exc:
+            logger.warning(f"Re-index failed for {doc.title}: {exc}")
+    return success_count
+
+
 def seed_documents():
     """Import markdown course materials into the knowledge base.
 
     Copies each markdown file to the uploads directory, creates a
     KnowledgeBaseDocument record linked to its chapter, and indexes
     the content into Milvus via the background processing pipeline.
-    Skips chapters that already have documents.
+
+    If documents already exist in the DB, checks whether they need
+    re-indexing (e.g. when cloning the repo to a new machine where
+    Milvus is empty).
     """
     db = SessionLocal()
     try:
-        # Check if any document already exists — skip entirely if so
-        existing = db.query(KnowledgeBaseDocument).count()
-        if existing > 0:
-            logger.info(f"{existing} documents already exist, skipping seed.")
+        existing_count = db.query(KnowledgeBaseDocument).count()
+        if existing_count > 0:
+            logger.info(f"{existing_count} documents already exist in DB.")
+            # Check if Milvus has data — if not, re-index
+            if not _check_milvus_has_data():
+                logger.info("Milvus is empty, re-indexing existing documents...")
+                indexed = _reindex_all_documents(db)
+                logger.info(f"Re-indexed {indexed}/{existing_count} documents.")
+            else:
+                logger.info("Milvus already has data, skipping re-index.")
             return
 
         # Locate course materials directory
