@@ -4,12 +4,41 @@
       <h2>章节测评</h2>
     </div>
 
-    <el-card shadow="never" v-loading="loading">
-      <template v-if="!loading && questions.length === 0">
+    <el-card shadow="never">
+      <!-- 生成题目 - 加载提示 -->
+      <div v-if="generating" class="ai-operating-tip">
+        <div class="ai-operating-content">
+          <el-icon class="is-loading ai-operating-icon"><Loading /></el-icon>
+          <p class="ai-operating-text">{{ loadingTip }}</p>
+          <p class="ai-operating-sub">{{ loadingSub }}</p>
+          <el-progress
+            :percentage="Math.round(generatingProgress)"
+            :stroke-width="6"
+            :show-text="false"
+            class="ai-progress"
+          />
+        </div>
+      </div>
+
+      <!-- 批改中 - 加载提示 -->
+      <div v-else-if="evaluating" class="ai-operating-tip">
+        <div class="ai-operating-content">
+          <el-icon class="is-loading ai-operating-icon"><Loading /></el-icon>
+          <p class="ai-operating-text">{{ loadingTip }}</p>
+          <p class="ai-operating-sub">{{ loadingSub }}</p>
+          <el-progress
+            :percentage="Math.round(evalProgress)"
+            :stroke-width="6"
+            class="ai-progress"
+          />
+        </div>
+      </div>
+
+      <template v-else-if="!loading && questions.length === 0">
         <el-empty description="暂无测评题目" />
       </template>
 
-      <template v-if="questions.length > 0 && currentQuestion">
+      <template v-else-if="questions.length > 0 && currentQuestion">
         <div class="assessment-progress">
           <span>第 {{ currentIndex + 1 }} / {{ totalCount }} 题</span>
           <el-progress
@@ -102,14 +131,6 @@
         </div>
       </template>
 
-      <!-- 加载完成后但无题目 -->
-      <template v-if="!loading && questions.length === 0">
-        <div style="text-align: center; padding: 40px 0;">
-          <el-button type="primary" @click="router.push('/chapters')">
-            返回章节列表
-          </el-button>
-        </div>
-      </template>
     </el-card>
   </div>
 </template>
@@ -118,6 +139,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import {
   startAssessment,
   getCurrentQuestion,
@@ -131,6 +153,12 @@ const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
+const generating = ref(true)         // 初始即为生成中状态，避免空白闪烁
+const evaluating = ref(false)        // 正在 AI 批改
+const generatingProgress = ref(0)    // 生成题目进度条
+const evalProgress = ref(0)          // 批改进度条
+const loadingTip = ref('')           // AI 操作主提示文字
+const loadingSub = ref('')           // AI 操作副提示文字
 const submitting = ref(false)
 const questions = ref<QuestionData[]>([])
 const recordId = ref<number>(0)
@@ -194,9 +222,24 @@ onMounted(async () => {
   const chapterId = Number(route.params.id)
   if (!chapterId) {
     ElMessage.error('无效的章节 ID')
+    generating.value = false
     loading.value = false
     return
   }
+
+  // 进入 AI 生成题目阶段
+  generating.value = true
+  loadingTip.value = '正在生成题目...'
+  loadingSub.value = 'AI 正在根据考核配置为您生成个性化试题，请稍候'
+
+  // 模拟进度条（AI 过程耗时不确定，缓慢增长到 90% 给用户反馈）
+  let genTimer: ReturnType<typeof setInterval> | null = null
+  genTimer = setInterval(() => {
+    if (generatingProgress.value < 90) {
+      generatingProgress.value += Math.floor(Math.random() * 8) + 2
+      if (generatingProgress.value > 90) generatingProgress.value = 90
+    }
+  }, 600)
 
   try {
     // 开始测评 — 后端会通过 LLM 生成题目
@@ -209,6 +252,12 @@ onMounted(async () => {
   } catch (err: any) {
     ElMessage.error(err.message || '无法开始测评，请确认该章节已配置考核')
   } finally {
+    // 停止进度条模拟
+    if (genTimer) clearInterval(genTimer)
+    generatingProgress.value = 100
+    // 短暂停留让用户看到完成状态
+    await new Promise(r => setTimeout(r, 300))
+    generating.value = false
     loading.value = false
   }
 })
@@ -315,17 +364,36 @@ function prevQuestion() {
 
 async function handleSubmitAll() {
   if (!recordId.value) return
-  submitting.value = true
+  evaluating.value = true
+  loadingTip.value = '正在批改答卷...'
+  loadingSub.value = 'AI 正在评估您的答案并生成评价报告，请稍候'
+  evalProgress.value = 0
+
+  // 模拟进度条（AI 批改耗时不确定，缓慢增长到 90%）
+  let evalTimer: ReturnType<typeof setInterval> | null = null
+  evalTimer = setInterval(() => {
+    if (evalProgress.value < 90) {
+      evalProgress.value += Math.floor(Math.random() * 6) + 1
+      if (evalProgress.value > 90) evalProgress.value = 90
+    }
+  }, 500)
+
   try {
     const result = await submitAssessment(recordId.value)
+    // 停止进度条模拟，直接跳到 100%
+    if (evalTimer) clearInterval(evalTimer)
+    evalProgress.value = 100
+    await new Promise(r => setTimeout(r, 300))
+    evaluating.value = false
     ElMessage.success('测评完成！')
     router.push(
       `/assessment/${recordId.value}/results?correct=${result.correct_answers}&total=${result.total_questions}&score=${Math.round(result.total_score)}`
     )
   } catch (err: any) {
+    if (evalTimer) clearInterval(evalTimer)
+    evaluating.value = false
+    evalProgress.value = 0
     ElMessage.error(err.message || '交卷失败')
-  } finally {
-    submitting.value = false
   }
 }
 </script>
@@ -418,5 +486,44 @@ async function handleSubmitAll() {
 
 .answered-hint {
   margin-top: 16px;
+}
+
+// AI 操作中的加载提示（生成题目 / 批改答卷）
+.ai-operating-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  text-align: center;
+}
+
+.ai-operating-content {
+  max-width: 360px;
+  width: 100%;
+}
+
+.ai-operating-icon {
+  font-size: 40px;
+  color: $primary-color;
+  margin-bottom: 16px;
+}
+
+.ai-operating-text {
+  font-size: 17px;
+  font-weight: 600;
+  color: $text-primary;
+  margin-bottom: 8px;
+}
+
+.ai-operating-sub {
+  font-size: 13px;
+  color: $text-secondary;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.ai-progress {
+  max-width: 280px;
+  margin: 0 auto;
 }
 </style>
